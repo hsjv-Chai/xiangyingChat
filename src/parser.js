@@ -102,7 +102,8 @@ function resolveLocalFile(candidates, baseDir) {
 }
 
 function localimgUrl(absPath) {
-  return 'localimg://local/' + absPath.replace(/^\//, '').split('/').map(encodeURIComponent).join('/');
+  const clean = String(absPath).replace(/\\/g, '/').replace(/^\//, '');
+  return 'localimg://local/' + clean.split('/').map(encodeURIComponent).join('/');
 }
 
 function resolveImage(content, baseDir) {

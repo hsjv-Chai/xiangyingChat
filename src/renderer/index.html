@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
         content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' localimg: https: data:; media-src 'self' localimg: https:;">
-  <title>聊天记录阅读器</title>
+  <title>响应消息</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -37,9 +37,27 @@
           <div id="chatSub" class="chat-sub"></div>
         </div>
         <div class="chat-actions">
+          <button id="exportBtn" class="icon-btn" title="选择消息并导出为图片">
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+              <circle cx="8.5" cy="8.5" r="1.5"/>
+              <path d="m21 15-5-5L5 21"/>
+            </svg>
+          </button>
           <button id="chatSearchBtn" class="icon-btn" title="搜索聊天记录">🔍</button>
         </div>
       </header>
+
+      <div id="selectBar" class="select-bar">
+        <span class="select-info">已选 <b id="selectCount">0</b> 条</span>
+        <div class="select-actions">
+          <button id="selectAllBtn" class="secondary-btn">全选</button>
+          <button id="clearSelBtn" class="secondary-btn">清空</button>
+          <button id="exportSelBtn" class="primary-btn">导出选中</button>
+          <button id="cancelSelBtn" class="secondary-btn">取消</button>
+        </div>
+      </div>
 
       <div id="chatSearchBar" class="chat-search">
         <input id="chatSearch" type="text" placeholder="搜索当前会话内容">
@@ -58,6 +76,14 @@
       <button id="lbZoomOut" title="缩小">−</button>
       <button id="lbZoomIn" title="放大">+</button>
       <button id="lbReset" title="重置">⤢</button>
+      <button id="lbSave" title="保存图片为文件">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+      </button>
       <button id="lbClose" title="关闭">✕</button>
     </div>
     <img id="lightboxImg" alt="图片预览">

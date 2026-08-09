@@ -1,0 +1,186 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", "Microsoft YaHei", sans-serif;
+  background: #fff;
+  color: #182230;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 导出页需要滚动分片截图，隐藏滚动条但不禁止滚动 */
+::-webkit-scrollbar {
+  display: none;
+}
+
+#export {
+  width: 760px;
+  padding: 34px 30px 44px;
+}
+
+.export-header {
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.export-title {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.export-sub {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-top: 7px;
+}
+
+.export-rule {
+  height: 1px;
+  background: #eef2f0;
+  margin: 20px 0 26px;
+}
+
+.day-divider {
+  text-align: center;
+  margin: 22px 0 8px;
+}
+
+.day-divider span {
+  display: inline-block;
+  background: #eef2f0;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 14px;
+  border-radius: 999px;
+}
+
+.msg-row {
+  display: flex;
+  align-items: flex-start;
+  margin: 16px 0;
+  gap: 10px;
+}
+
+.msg-row.me {
+  flex-direction: row-reverse;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 2px #fff, 0 2px 8px rgba(16, 24, 40, 0.10);
+}
+
+.msg-body {
+  max-width: 70%;
+  min-width: 0;
+}
+
+.msg-name {
+  font-size: 12px;
+  color: #94a3b8;
+  margin-bottom: 4px;
+  padding-left: 3px;
+}
+
+.bubble {
+  background: #f5f8f6;
+  border-radius: 4px 12px 12px 12px;
+  padding: 9px 13px;
+  font-size: 14px;
+  line-height: 1.65;
+  word-break: break-word;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.me .bubble {
+  background: #e7f9ef;
+  border-radius: 12px 4px 12px 12px;
+}
+
+.msg-text {
+  white-space: pre-wrap;
+}
+
+.msg-time {
+  font-size: 10px;
+  color: #c0c8d2;
+  margin-top: 5px;
+  padding: 0 3px;
+}
+
+.me .msg-time {
+  text-align: right;
+}
+
+.quote-card {
+  background: #f1f5f9;
+  border-left: 3px solid #dbe4e0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 7px;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.quote-name {
+  color: #182230;
+  font-weight: 600;
+}
+
+.bubble-img {
+  padding: 4px;
+  display: block;
+}
+
+.msg-img {
+  display: block;
+  max-width: 240px;
+  max-height: 300px;
+  border-radius: 10px;
+  background: #eef2f0;
+}
+
+.note-title {
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+.note-content {
+  white-space: pre-wrap;
+  margin-bottom: 5px;
+}
+
+.audio-text {
+  color: #0b7d4c;
+  font-weight: 500;
+}
+
+.msg-link {
+  color: #3d7fd9;
+  text-decoration: none;
+  word-break: break-all;
+}
+
+.unknown {
+  color: #94a3b8;
+  font-style: italic;
+}

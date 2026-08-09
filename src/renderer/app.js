@@ -14,6 +14,8 @@ const state = {
   matchIndex: -1,
   zoom: 1,
   currentAudio: null,
+  selectMode: false,
+  selected: new Set(),
 };
 
 /* ---------------- 工具函数 ---------------- */
@@ -31,7 +33,8 @@ function escapeRegExp(value) {
 }
 
 function localimgUrl(absPath) {
-  return 'localimg://local/' + absPath.replace(/^\//, '').split('/').map(encodeURIComponent).join('/');
+  const clean = String(absPath).replace(/\\/g, '/').replace(/^\//, '');
+  return 'localimg://local/' + clean.split('/').map(encodeURIComponent).join('/');
 }
 
 function hashHue(text) {
@@ -145,9 +148,12 @@ function bubbleHtml(msg) {
 
 function messageRow(msg) {
   const isMe = state.me && msg.fromName === state.me;
+  const msgId = String(msg.msgId);
   const row = document.createElement('div');
-  row.className = 'msg-row' + (isMe ? ' me' : '');
+  row.className = 'msg-row' + (isMe ? ' me' : '') + (state.selected.has(msgId) ? ' selected' : '');
+  row.dataset.msgId = msgId;
   row.innerHTML =
+    '<div class="msg-check" title="选择此消息"></div>' +
     avatarHtml(msg.fromName, 36) +
     '<div class="msg-body">' +
     (isMe ? '' : '<div class="msg-name">' + escapeHtml(msg.fromName) + '</div>') +
@@ -163,6 +169,7 @@ function renderMessages() {
   el.innerHTML = '';
   state.matches = [];
   state.matchIndex = -1;
+  el.classList.toggle('select-mode', state.selectMode);
 
   // 导出为倒序（新消息在前），聊天视图按时间正序展示
   const ordered = state.messages.slice().reverse();
@@ -186,6 +193,83 @@ function renderMessages() {
   }
   updateMatchCount();
   el.scrollTop = el.scrollHeight;
+}
+
+/* ---------------- 选择导出模式 ---------------- */
+
+function updateSelectCount() {
+  $('#selectCount').textContent = state.selected.size;
+}
+
+function enterSelectionMode() {
+  if (!state.currentTitle) {
+    toast('请先选择一个会话');
+    return;
+  }
+  state.selectMode = true;
+  state.selected.clear();
+  $('#selectBar').classList.add('show');
+  const scrollTop = $('#messages').scrollTop;
+  renderMessages();
+  $('#messages').scrollTop = scrollTop;
+  updateSelectCount();
+}
+
+function exitSelectionMode() {
+  if (!state.selectMode) return;
+  state.selectMode = false;
+  state.selected.clear();
+  $('#selectBar').classList.remove('show');
+  const scrollTop = $('#messages').scrollTop;
+  renderMessages();
+  $('#messages').scrollTop = scrollTop;
+}
+
+function toggleSelect(msgId, row) {
+  if (!state.selectMode) return;
+  const id = String(msgId);
+  if (state.selected.has(id)) {
+    state.selected.delete(id);
+    if (row) row.classList.remove('selected');
+  } else {
+    state.selected.add(id);
+    if (row) row.classList.add('selected');
+  }
+  updateSelectCount();
+}
+
+function selectAllMessages() {
+  if (!state.selectMode) return;
+  state.selected = new Set(state.messages.map((m) => String(m.msgId)));
+  document.querySelectorAll('#messages .msg-row').forEach((row) => {
+    if (state.selected.has(row.dataset.msgId)) row.classList.add('selected');
+  });
+  updateSelectCount();
+}
+
+function clearMessageSelection() {
+  if (!state.selectMode) return;
+  state.selected.clear();
+  document.querySelectorAll('#messages .msg-row').forEach((row) => row.classList.remove('selected'));
+  updateSelectCount();
+}
+
+async function exportSelected() {
+  if (!state.selectMode) return;
+  if (state.selected.size === 0) {
+    toast('请先选择要导出的消息');
+    return;
+  }
+  toast('正在导出图片…');
+  const res = await chatAPI.exportImage(state.currentTitle, Array.from(state.selected));
+  if (res && res.saved) {
+    toast('已导出：' + res.path);
+    exitSelectionMode();
+  } else if (res && res.canceled) {
+    toast('已取消导出');
+  } else {
+    toast((res && res.error) || '导出失败');
+  }
 }
 
 function highlightMatch(index) {
@@ -284,6 +368,7 @@ async function openFolder() {
 }
 
 async function selectConversation(title) {
+  if (state.selectMode) exitSelectionMode();
   const res = await chatAPI.loadConversation(title);
   if (!res || res.error) {
     toast(res ? res.error : '加载失败');
@@ -397,6 +482,15 @@ function bindEvents() {
     }
   });
 
+  $('#exportBtn').addEventListener('click', () => {
+    if (state.selectMode) exitSelectionMode();
+    else enterSelectionMode();
+  });
+  $('#selectAllBtn').addEventListener('click', selectAllMessages);
+  $('#clearSelBtn').addEventListener('click', clearMessageSelection);
+  $('#exportSelBtn').addEventListener('click', exportSelected);
+  $('#cancelSelBtn').addEventListener('click', exitSelectionMode);
+
   let searchTimer = null;
   $('#chatSearch').addEventListener('input', () => {
     clearTimeout(searchTimer);
@@ -419,6 +513,11 @@ function bindEvents() {
   });
 
   $('#messages').addEventListener('click', (e) => {
+    const row = e.target.closest('.msg-row');
+    if (state.selectMode && row) {
+      toggleSelect(row.dataset.msgId, row);
+      return;
+    }
     const link = e.target.closest('.msg-link');
     if (link) {
       e.preventDefault();
@@ -440,6 +539,7 @@ function bindEvents() {
   });
 
   $('#lbClose').addEventListener('click', closeLightbox);
+  $('#lbSave').addEventListener('click', saveLightboxImage);
   $('#lbZoomIn').addEventListener('click', () => zoomBy(0.5));
   $('#lbZoomOut').addEventListener('click', () => zoomBy(-0.5));
   $('#lbReset').addEventListener('click', () => {
@@ -460,9 +560,29 @@ function bindEvents() {
 
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      if ($('#lightbox').classList.contains('show')) closeLightbox();
+      if (state.selectMode) exitSelectionMode();
+      else if ($('#lightbox').classList.contains('show')) closeLightbox();
       else closeSettings();
     }
+  });
+}
+
+async function saveLightboxImage() {
+  const src = $('#lightboxImg').src;
+  if (!src) return;
+  toast('正在保存图片…');
+  const res = await chatAPI.saveImage(src);
+  if (res && res.saved) toast('已保存：' + res.path);
+  else if (res && res.canceled) toast('已取消保存');
+  else toast((res && res.error) || '保存失败');
+}
+
+function registerExportResultListener() {
+  chatAPI.onExportResult((res) => {
+    if (!res) return;
+    if (res.saved) toast('已导出：' + res.path);
+    else if (res.canceled) toast('已取消导出');
+    else if (res.error) toast(res.error);
   });
 }
 
@@ -470,6 +590,7 @@ function bindEvents() {
 
 async function init() {
   bindEvents();
+  registerExportResultListener();
   try {
     const res = await chatAPI.init();
     state.folderPath = res.settings.folder || '';

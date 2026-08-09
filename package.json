@@ -2,13 +2,54 @@
   "name": "wechat-chat-viewer",
   "version": "0.1.0",
   "description": "微信风格聊天记录阅读器：以聊天形式阅读学海/微信导出的 HTML 记录",
+  "productName": "响应消息",
+  "author": "hsjv",
   "main": "src/main.js",
   "scripts": {
-    "start": "electron .",
-    "test": "node test/parse.test.js"
+    "start": "node scripts/dev.mjs",
+    "test": "node test/parse.test.js",
+    "dist": "electron-builder --mac",
+    "dist:win": "electron-builder --win --x64"
   },
   "license": "MIT",
+  "build": {
+    "appId": "com.xiangying.responsechat",
+    "productName": "响应消息",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "src/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "icon": "src/assets/icon.icns",
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg"
+      ],
+      "identity": null
+    },
+    "win": {
+      "icon": "src/assets/icon-512.png",
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "dmg": {
+      "title": "响应消息"
+    }
+  },
   "devDependencies": {
-    "electron": "^43.3.0"
+    "electron": "^43.3.0",
+    "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0"
   }
 }
