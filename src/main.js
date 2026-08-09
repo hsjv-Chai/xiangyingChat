@@ -87,7 +87,7 @@ async function captureFullPage(win, naturalHeight) {
   win.showInactive();
   await sleep(400);
 
-  const factor = naturalHeight > 13000 ? 2 : 1; // 2 = 截 2x 后缩小为 1x
+  const factor = naturalHeight > 13000 ? 2 : 1; // 2 = 超长会话，输出 1x 控制体积
   const targetWidth = factor === 2 ? EXPORT_WIDTH : EXPORT_WIDTH * 2;
   const sliceBuffers = [];
   let y = 0;
@@ -101,20 +101,20 @@ async function captureFullPage(win, naturalHeight) {
     const shot = await win.webContents.capturePage();
     if (shot.isEmpty()) throw new Error('截图失败');
 
-    const h = shot.getSize().height;
-    if (factor === 2) {
-      const resized = shot.resize({ width: targetWidth, height: Math.round(h / 2) });
-      sliceBuffers.push(resized.toPNG());
-      totalHeight += Math.round(h / 2);
-    } else {
-      sliceBuffers.push(shot.toPNG());
-      totalHeight += h;
-    }
+    // 屏幕缩放(DPI)不同会导致截图宽度不是固定 targetWidth。
+    // 统一等比缩放到 targetWidth 再拼接，避免每行按 targetWidth 读取时越界混入相邻行，
+    // 从而出现右侧重复内容或空白。
+    const shotW = shot.getSize().width;
+    const shotH = shot.getSize().height;
+    const resizedH = Math.max(1, Math.round(shotH * targetWidth / shotW));
+    const resized = shot.resize({ width: targetWidth, height: resizedH });
+    sliceBuffers.push(resized.toPNG());
+    totalHeight += resizedH;
 
     const viewportH = await win.webContents
       .executeJavaScript('window.innerHeight')
       .catch(() => EXPORT_SLICE);
-    if (SMOKE) console.log('EXPORT_SLICE', 'y=' + y, 'viewport=' + viewportH, 'capturedH=' + h);
+    if (SMOKE) console.log('EXPORT_SLICE', 'y=' + y, 'viewport=' + viewportH, 'capturedH=' + shotH);
     y += Math.max(1, Math.floor(viewportH));
   }
 
