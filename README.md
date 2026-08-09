@@ -22,7 +22,7 @@
 
 ```bash
 # 1. 进入项目目录
-cd /Users/hsjv/Documents/ChatGPT/xiangyingChat
+cd xiangyingChat
 
 # 2. 安装依赖（首次需要联网，会下载 Electron）
 npm install
@@ -49,12 +49,12 @@ npm start
 
 ```text
 响应导出/
-├── 高三15班语文.html          ← 聊天记录文件
-├── 高三15班语文/              ← 同名目录：存放该会话的本地图片
+├── 高三xx班语文.html          ← 聊天记录文件
+├── 高三xx班语文/              ← 同名目录：存放该会话的本地图片
 │   ├── xxxx.jpeg
 │   └── ...
-├── 吴亦巨.html
-└── 吴亦巨/
+├── xxx.html
+└── xxx/
 ```
 
 应用会扫描文件夹内的全部 `.html` 文件并自动解析，无法解析的文件会跳过并在界面提示。
