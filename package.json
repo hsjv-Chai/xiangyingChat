@@ -1,6 +1,6 @@
 {
   "name": "wechat-chat-viewer",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "微信风格聊天记录阅读器：以聊天形式阅读学海/微信导出的 HTML 记录",
   "productName": "响应消息",
   "author": "hsjv",
