@@ -77,9 +77,10 @@ async function waitForExportReady(win, timeout = 20000) {
 }
 
 /**
- * 分片滚动截图并拼接为一张完整 PNG。
- * 窗口高度会被 macOS 钳制到屏幕高度，因此按实际视口高度滚动、逐片截取，
- * 再用 pngjs 按每片实际像素高度拼合；超长会话自动降为 1x 尺寸控制体积。
+ * 导出整页图片。
+ * 离屏/隐藏窗口的 GPU 合成器不会为新的滚动位置出新帧，capturePage() 会反复拿到首帧
+ * （页面顶部），导致分片截图重复。这里改用 CDP：用 Emulation 把渲染视口临时拉满到整页
+ * CSS 尺寸后整页截屏，不依赖窗口合成器，从根上消除重复。
  */
 async function captureFullPage(win, naturalHeight) {
   win.setContentSize(EXPORT_WIDTH, Math.min(EXPORT_SLICE, naturalHeight));
@@ -87,48 +88,50 @@ async function captureFullPage(win, naturalHeight) {
   win.showInactive();
   await sleep(400);
 
-  const factor = naturalHeight > 13000 ? 2 : 1; // 2 = 超长会话，输出 1x 控制体积
-  const targetWidth = factor === 2 ? EXPORT_WIDTH : EXPORT_WIDTH * 2;
-  const sliceBuffers = [];
-  let y = 0;
-  let totalHeight = 0;
+  // 等页面图片与字体加载完成，避免截图缺图/默认字体。
+  await win.webContents
+    .executeJavaScript(
+      `(async () => {
+         const imgs = Array.from(document.images);
+         await Promise.all(imgs.map((i) =>
+           i.complete ? Promise.resolve() : new Promise((r) => { i.onload = i.onerror = r; })
+         ));
+         if (document.fonts && document.fonts.ready) await document.fonts.ready;
+         return true;
+       })()`
+    )
+    .catch(() => true);
 
-  while (y < naturalHeight) {
-    if (y > 0) {
-      await win.webContents.executeJavaScript(`window.scrollTo(0, ${y})`);
-      await sleep(150);
-    }
-    const shot = await win.webContents.capturePage();
-    if (shot.isEmpty()) throw new Error('截图失败');
+  const cdp = win.webContents.debugger;
+  cdp.attach('1.3');
+  try {
+    const metrics = await win.webContents.executeJavaScript(`({
+      w: document.documentElement.clientWidth,
+      h: document.documentElement.scrollHeight,
+      dpr: window.devicePixelRatio,
+    })`);
+    const cssW = Math.max(1, Math.round(metrics.w));
+    const cssH = Math.max(1, Math.round(metrics.h));
+    const dpr = metrics.dpr || 1;
 
-    // 屏幕缩放(DPI)不同会导致截图宽度不是固定 targetWidth。
-    // 统一等比缩放到 targetWidth 再拼接，避免每行按 targetWidth 读取时越界混入相邻行，
-    // 从而出现右侧重复内容或空白。
-    const shotW = shot.getSize().width;
-    const shotH = shot.getSize().height;
-    const resizedH = Math.max(1, Math.round(shotH * targetWidth / shotW));
-    const resized = shot.resize({ width: targetWidth, height: resizedH });
-    sliceBuffers.push(resized.toPNG());
-    totalHeight += resizedH;
+    // 用 Emulation 把渲染视口临时拉满到整页 CSS 尺寸，再整页截屏：
+    // 视口=整页后无滚动、无二次缩放，也不依赖离屏窗口的 GPU 合成器出帧。
+    await cdp.sendCommand('Page.enable');
+    await cdp.sendCommand('Emulation.setDeviceMetricsOverride', {
+      width: cssW,
+      height: cssH,
+      deviceScaleFactor: dpr,
+      mobile: false,
+    });
+    await sleep(150);
+    const { data } = await cdp.sendCommand('Page.captureScreenshot', { format: 'png' });
 
-    const viewportH = await win.webContents
-      .executeJavaScript('window.innerHeight')
-      .catch(() => EXPORT_SLICE);
-    if (SMOKE) console.log('EXPORT_SLICE', 'y=' + y, 'viewport=' + viewportH, 'capturedH=' + shotH);
-    y += Math.max(1, Math.floor(viewportH));
+    return Buffer.from(data, 'base64');
+  } finally {
+    try {
+      cdp.detach();
+    } catch {}
   }
-
-  const finalPng = new PNG({ width: targetWidth, height: totalHeight });
-  let rowOffset = 0;
-  for (const buffer of sliceBuffers) {
-    const slice = PNG.sync.read(buffer);
-    for (let row = 0; row < slice.height; row++) {
-      const srcStart = row * slice.width * 4;
-      slice.data.copy(finalPng.data, (rowOffset + row) * targetWidth * 4, srcStart, srcStart + targetWidth * 4);
-    }
-    rowOffset += slice.height;
-  }
-  return PNG.sync.write(finalPng);
 }
 
 /* ---------------- 图片保存 / 复制 / 右键菜单 ---------------- */
