@@ -206,9 +206,3 @@ npm test
 
 **想清空历史记录（上次打开的文件夹 / 「我」的设置）**
 退出应用后删除 `~/Library/Application Support/wechat-chat-viewer/config.json` 即可。
-
-## 已知限制（v1）
-
-- 仅支持「打开文件夹」批量导入，不支持单独拖入单个文件
-- 仅本地运行（`npm start`），暂不提供 `.dmg` 安装包
-- 导出图片为 PNG 单张长图；超长会话自动降为 1x 清晰度以控制体积，暂不提供分段导出
