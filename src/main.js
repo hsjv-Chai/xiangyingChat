@@ -14,6 +14,7 @@ const {
 } = require('electron');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const { pathToFileURL } = require('url');
 const { PNG } = require('pngjs');
 const { scanFolder } = require('./parser');
@@ -445,6 +446,54 @@ function registerIpc() {
   ipcMain.handle('export-image', (_event, title, msgIds) => exportConversationImage(title, msgIds));
 
   ipcMain.handle('save-image', (_event, src) => saveImageFromSrc(src));
+
+  ipcMain.handle('get-audio', async (_event, payload) => {
+    try {
+      if (SMOKE) {
+        // 冒烟测试使用内置测试语音，避免依赖网络
+        const fixture = path.join(__dirname, 'assets', 'voice-test.amr');
+        if (fs.existsSync(fixture)) {
+          const buf = fs.readFileSync(fixture);
+          return { buffer: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
+        }
+      }
+
+      const serverpath = payload && typeof payload.serverpath === 'string' ? payload.serverpath : '';
+      const localpath = payload && typeof payload.localpath === 'string' ? payload.localpath : '';
+      if (!serverpath && !localpath) return { error: '没有可用的语音文件' };
+
+      const cacheDir = path.join(app.getPath('userData'), 'audio-cache');
+      fs.mkdirSync(cacheDir, { recursive: true });
+      const hash = crypto.createHash('sha1').update(serverpath || localpath).digest('hex');
+      const cacheFile = path.join(cacheDir, hash + '.amr');
+
+      if (fs.existsSync(cacheFile)) {
+        const buf = fs.readFileSync(cacheFile);
+        return { buffer: buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength) };
+      }
+
+      let data = null;
+      if (localpath) {
+        try {
+          if (fs.existsSync(localpath) && fs.statSync(localpath).isFile()) data = fs.readFileSync(localpath);
+        } catch {
+          /* 本地路径不可读时忽略 */
+        }
+      }
+      if (!data && /^https?:\/\//i.test(serverpath)) {
+        const response = await net.fetch(serverpath);
+        if (!response.ok) return { error: '语音下载失败（' + response.status + '）' };
+        data = Buffer.from(await response.arrayBuffer());
+      }
+      if (!data) return { error: '没有可用的语音文件' };
+
+      fs.writeFileSync(cacheFile, data);
+      return { buffer: data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) };
+    } catch (err) {
+      console.error('获取语音失败:', err);
+      return { error: '语音获取失败：' + err.message };
+    }
+  });
 }
 
 /* ---------------- 窗口 ---------------- */
@@ -506,6 +555,32 @@ function createWindow() {
                const pickedAudio = pick('23通用选考群');
                await sleep(600);
                const audioCount = document.querySelectorAll('#messages .audio-bubble').length;
+               const audioBubbles = Array.from(document.querySelectorAll('#messages .audio-bubble'));
+               if (audioBubbles[0]) audioBubbles[0].click();
+               let audioPlaying = false;
+               for (let i = 0; i < 40; i++) {
+                 await sleep(50);
+                 if (document.querySelector('#messages .audio-bubble.playing')) {
+                   audioPlaying = true;
+                   break;
+                 }
+               }
+               const playingProgress = document.querySelector('#messages .audio-bubble.playing .audio-progress');
+               const audioProgressText = playingProgress ? playingProgress.textContent : '';
+               const pauseTarget = document.querySelector('#messages .audio-bubble.playing');
+               if (pauseTarget) pauseTarget.click();
+               await sleep(150);
+               const audioPaused = !document.querySelector('#messages .audio-bubble.playing');
+               if (audioBubbles[1]) audioBubbles[1].click();
+               let audioSwitched = false;
+               for (let i = 0; i < 40; i++) {
+                 await sleep(50);
+                 const p = document.querySelector('#messages .audio-bubble.playing');
+                 if (p && p !== audioBubbles[0]) {
+                   audioSwitched = true;
+                   break;
+                 }
+               }
 
                const pickedSingle = pick('吴亦巨');
                await sleep(600);
@@ -619,6 +694,10 @@ function createWindow() {
                  firstTitle,
                  pickedAudio,
                  audioCount,
+                 audioPlaying,
+                 audioProgressText,
+                 audioPaused,
+                 audioSwitched,
                  pickedSingle,
                  singleMsgs,
                  singleSenders,

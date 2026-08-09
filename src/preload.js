@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('api', {
   openExternal: (url) => ipcRenderer.invoke('open-external', url),
   exportImage: (title, msgIds) => ipcRenderer.invoke('export-image', title, msgIds),
   saveImage: (src) => ipcRenderer.invoke('save-image', src),
+  getAudio: (payload) => ipcRenderer.invoke('get-audio', payload),
   onExportResult: (callback) => {
     const listener = (_event, result) => callback(result);
     ipcRenderer.on('image-export-result', listener);

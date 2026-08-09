@@ -50,6 +50,7 @@
     "electron-builder": "^26.15.3"
   },
   "dependencies": {
+    "@audio/decode-amr": "^1.2.3",
     "pngjs": "^7.0.0"
   }
 }

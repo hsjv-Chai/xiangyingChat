@@ -13,7 +13,17 @@ const state = {
   matches: [],
   matchIndex: -1,
   zoom: 1,
-  currentAudio: null,
+  audio: {
+    ctx: null,
+    msgId: null,
+    source: null,
+    buffer: null,
+    startedAt: 0,
+    pausedAt: 0,
+    duration: 0,
+    playing: false,
+    timer: null,
+  },
   selectMode: false,
   selected: new Set(),
 };
@@ -140,8 +150,13 @@ function bubbleHtml(msg) {
     return imageHtml(msg);
   }
   if (msg.audio) {
+    const secs = msg.audio.voicelength || 0;
     return '<div class="bubble audio-bubble" data-audio="' + escapeHtml(msg.msgId) +
-      '"><span class="audio-icon">▶</span><span>语音</span></div>';
+      '" data-secs="' + secs + '">' +
+      '<span class="audio-icon">▶</span>' +
+      '<span class="audio-label">语音</span>' +
+      '<span class="audio-progress">' + (secs ? formatTime(secs) : '') + '</span>' +
+      '</div>';
   }
   return '<div class="bubble bubble-unknown">[不支持的消息类型]</div>';
 }
@@ -166,6 +181,7 @@ function messageRow(msg) {
 
 function renderMessages() {
   const el = $('#messages');
+  stopAudio();
   el.innerHTML = '';
   state.matches = [];
   state.matchIndex = -1;
@@ -425,22 +441,173 @@ function zoomBy(delta) {
   applyZoom();
 }
 
-function playAudio(msgId) {
-  const msg = state.messages.find((m) => String(m.msgId) === String(msgId));
+/* ---------------- 语音播放（AMR 解码 + Web Audio） ---------------- */
+
+function formatTime(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  const m = Math.floor(s / 60);
+  return m + ':' + String(s % 60).padStart(2, '0');
+}
+
+function getAudioCtx() {
+  if (!state.audio.ctx) {
+    state.audio.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return state.audio.ctx;
+}
+
+function setAudioBubbleUI() {
+  const currentId = String(state.audio.msgId || '');
+  document.querySelectorAll('.audio-bubble').forEach((el) => {
+    const isCurrent = el.dataset.audio === currentId;
+    el.classList.toggle('playing', isCurrent && state.audio.playing);
+    const icon = el.querySelector('.audio-icon');
+    const progress = el.querySelector('.audio-progress');
+    if (!icon || !progress) return;
+    if (isCurrent && state.audio.buffer) {
+      icon.textContent = state.audio.playing ? '⏸' : '▶';
+      const total = state.audio.duration || state.audio.buffer.duration;
+      const pos = state.audio.playing
+        ? Math.min(state.audio.ctx.currentTime - state.audio.startedAt, total)
+        : state.audio.pausedAt;
+      progress.textContent = formatTime(pos) + ' / ' + formatTime(total);
+    } else {
+      icon.textContent = '▶';
+      const secs = Number(el.dataset.secs) || 0;
+      progress.textContent = secs ? formatTime(secs) : '';
+    }
+  });
+}
+
+function startPlayback() {
+  const ctx = getAudioCtx();
+  if (ctx.state === 'suspended') ctx.resume();
+  if (state.audio.source) {
+    try {
+      state.audio.source.disconnect();
+    } catch {
+      /* ignore */
+    }
+  }
+  const source = ctx.createBufferSource();
+  source.buffer = state.audio.buffer;
+  source.connect(ctx.destination);
+  const offset = Math.min(state.audio.pausedAt, state.audio.buffer.duration);
+  source.start(0, offset);
+  state.audio.source = source;
+  state.audio.startedAt = ctx.currentTime - offset;
+  state.audio.pausedAt = offset;
+  state.audio.playing = true;
+  source.onended = () => {
+    if (state.audio.source === source) {
+      state.audio.playing = false;
+      state.audio.source = null;
+      state.audio.pausedAt = 0;
+      clearInterval(state.audio.timer);
+      state.audio.timer = null;
+      setAudioBubbleUI();
+    }
+  };
+  clearInterval(state.audio.timer);
+  state.audio.timer = setInterval(setAudioBubbleUI, 250);
+  setAudioBubbleUI();
+}
+
+function pauseAudio() {
+  if (!state.audio.source || !state.audio.playing) return;
+  state.audio.pausedAt = Math.min(
+    state.audio.ctx.currentTime - state.audio.startedAt,
+    state.audio.duration || state.audio.buffer.duration
+  );
+  try {
+    state.audio.source.stop();
+  } catch {
+    /* ignore */
+  }
+  state.audio.source = null;
+  state.audio.playing = false;
+  clearInterval(state.audio.timer);
+  state.audio.timer = null;
+  setAudioBubbleUI();
+}
+
+function stopAudio() {
+  if (state.audio.source) {
+    try {
+      state.audio.source.stop();
+    } catch {
+      /* ignore */
+    }
+    state.audio.source = null;
+  }
+  state.audio.msgId = null;
+  state.audio.buffer = null;
+  state.audio.playing = false;
+  state.audio.pausedAt = 0;
+  state.audio.duration = 0;
+  clearInterval(state.audio.timer);
+  state.audio.timer = null;
+  setAudioBubbleUI();
+}
+
+async function playAudio(msgId) {
+  const id = String(msgId);
+  const msg = state.messages.find((m) => String(m.msgId) === id);
   if (!msg || !msg.audio) return;
-  const src = msg.audio.localPath ? localimgUrl(msg.audio.localPath) : msg.audio.serverpath;
-  if (!src) {
-    toast('没有可用的语音文件');
+
+  // 同一条：播放中则暂停，暂停中则继续
+  if (state.audio.msgId === id && state.audio.playing) {
+    pauseAudio();
     return;
   }
-  try {
-    if (state.currentAudio) state.currentAudio.pause();
-    const audio = new Audio(src);
-    state.currentAudio = audio;
-    audio.play().catch(() => toast('语音暂时无法播放'));
-  } catch {
-    toast('语音暂时无法播放');
+  if (state.audio.msgId === id && !state.audio.playing && state.audio.buffer) {
+    startPlayback();
+    return;
   }
+
+  // 切换新语音：先停旧的
+  if (state.audio.source) stopAudio();
+  state.audio.msgId = id;
+  state.audio.pausedAt = 0;
+  setAudioBubbleUI();
+  toast('正在加载语音…');
+
+  const res = await chatAPI.getAudio({
+    serverpath: msg.audio.serverpath,
+    localpath: msg.audio.localpath,
+  });
+  if (!res || res.error) {
+    state.audio.msgId = null;
+    setAudioBubbleUI();
+    toast((res && res.error) || '语音暂时无法播放');
+    return;
+  }
+
+  let pcm;
+  try {
+    pcm = await globalThis.AMRDecode.decode(new Uint8Array(res.buffer));
+  } catch (err) {
+    console.error('AMR 解码失败:', err);
+    state.audio.msgId = null;
+    setAudioBubbleUI();
+    toast('语音解码失败');
+    return;
+  }
+
+  const samples = pcm.channelData[0] || new Float32Array(0);
+  if (!samples.length) {
+    state.audio.msgId = null;
+    setAudioBubbleUI();
+    toast('语音内容为空');
+    return;
+  }
+
+  const ctx = getAudioCtx();
+  const audioBuffer = ctx.createBuffer(1, samples.length, pcm.sampleRate || 8000);
+  audioBuffer.copyToChannel(samples, 0);
+  state.audio.buffer = audioBuffer;
+  state.audio.duration = msg.audio.voicelength || audioBuffer.duration;
+  startPlayback();
 }
 
 let toastTimer = null;

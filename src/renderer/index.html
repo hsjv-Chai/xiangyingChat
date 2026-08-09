@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' localimg: https: data:; media-src 'self' localimg: https:;">
+        content="default-src 'none'; script-src 'self' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' localimg: https: data:; media-src 'self' localimg: https:;">
   <title>响应消息</title>
   <link rel="stylesheet" href="styles.css">
 </head>
@@ -104,6 +104,8 @@
 
   <div id="toast" class="toast"></div>
 
+  <script src="vendor/amr.wasm.cjs"></script>
+  <script src="vendor/decode-amr.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

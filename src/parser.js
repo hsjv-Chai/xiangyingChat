@@ -154,6 +154,7 @@ function normalizeMessage(raw, baseDir) {
         serverpath: typeof c.serverpath === 'string' ? c.serverpath : '',
         localpath: typeof c.localpath === 'string' ? c.localpath : '',
         localPath: resolveLocalFile([c.localpath], baseDir),
+        voicelength: Number(c.voicelength) || 0,
       };
     }
   } else {

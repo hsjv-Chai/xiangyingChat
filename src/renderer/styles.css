@@ -517,18 +517,36 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-width: 110px;
+  min-width: 132px;
   user-select: none;
   color: #0b7d4c;
   font-weight: 500;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .me .audio-bubble {
   color: #fff;
 }
 
+.audio-bubble.playing {
+  background: rgba(7, 193, 96, 0.14);
+  box-shadow: 0 0 0 1.5px rgba(7, 193, 96, 0.45), var(--shadow-sm);
+}
+
+.me .audio-bubble.playing {
+  background: rgba(255, 255, 255, 0.20);
+  box-shadow: 0 0 0 1.5px rgba(255, 255, 255, 0.55), 0 3px 10px rgba(7, 193, 96, 0.28);
+}
+
 .audio-icon {
   font-size: 14px;
+}
+
+.audio-progress {
+  font-size: 12px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  margin-left: auto;
 }
 
 .bubble-unknown {
