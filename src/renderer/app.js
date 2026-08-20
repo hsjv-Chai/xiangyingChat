@@ -306,6 +306,28 @@ function updateMatchCount() {
   $('#matchCount').textContent = total ? (state.matchIndex + 1) + '/' + total : '0/0';
 }
 
+function selectContextMessage() {
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+
+  const msgId = window.__contextMsgId;
+  let target = null;
+  if (msgId) {
+    const row = document.querySelector('.msg-row[data-msg-id="' + CSS.escape(msgId) + '"]');
+    if (row) target = row.querySelector('.msg-body');
+  }
+
+  if (target) {
+    const range = document.createRange();
+    range.selectNodeContents(target);
+    selection.addRange(range);
+  } else if (!msgId) {
+    document.execCommand('selectAll');
+  }
+}
+
+window.__selectContextMessage = selectContextMessage;
+
 /* ---------------- 会话列表 ---------------- */
 
 function renderConvList() {
@@ -628,6 +650,11 @@ function clearSearch() {
 }
 
 function bindEvents() {
+  document.addEventListener('contextmenu', (e) => {
+    const row = e.target && e.target.closest ? e.target.closest('.msg-row') : null;
+    window.__contextMsgId = row ? row.dataset.msgId : null;
+  });
+
   $('#openFolderBtn').addEventListener('click', openFolder);
   $('#settingsBtn').addEventListener('click', openSettings);
   $('#settingsClose').addEventListener('click', closeSettings);

@@ -219,6 +219,16 @@ function notifyRenderer(payload) {
   }
 }
 
+function selectAllInRenderer() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents
+      .executeJavaScript(
+        'window.__selectContextMessage ? window.__selectContextMessage() : document.execCommand("selectAll")'
+      )
+      .catch(() => {});
+  }
+}
+
 function registerContextMenu() {
   mainWindow.webContents.on('context-menu', (_event, params) => {
     const template = [];
@@ -252,9 +262,9 @@ function registerContextMenu() {
     if (hasText) {
       if (template.length) template.push({ type: 'separator' });
       template.push({ label: '复制', role: 'copy' });
-      template.push({ label: '全选', role: 'selectAll' });
+      template.push({ label: '全选', click: selectAllInRenderer });
     } else if (!template.length) {
-      template.push({ label: '全选', role: 'selectAll' });
+      template.push({ label: '全选', click: selectAllInRenderer });
     }
 
     if (template.length) {
